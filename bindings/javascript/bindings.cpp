@@ -64,9 +64,8 @@ cavc::Polyline<double> getInput(const val& points, bool isClosed) {
     return input;
 }
 
-val createResultMultiPoints(std::vector<cavc::Polyline<double>>& multi_points, int point_type) {
+val createResultMultiPoints(std::vector<cavc::Polyline<double>>& multi_points, int point_type, val ret_val = val::array()) {
     auto new_point = getNewPointFunc(point_type);
-    auto ret_val = val::array();
     for (auto it = multi_points.begin(); it != multi_points.end(); ++it) {
         auto line = new_line(it->vertexes(), new_point);
         ret_val.call<void>("push", line);
@@ -75,50 +74,76 @@ val createResultMultiPoints(std::vector<cavc::Polyline<double>>& multi_points, i
     return ret_val;
 }
 
-val parallelOffset(val points, bool isClosed, double offset, int point_type) {
+val parallelOffset(val points, bool isClosed, double offset, int point_type, val ret_val) {
     if (!points.isArray()) return val::undefined();
     
     cavc::Polyline<double> input = getInput(points, isClosed);
     
     std::vector<cavc::Polyline<double>> results = cavc::parallelOffset(input, offset);
     
-    return createResultMultiPoints(results, point_type);
+    return createResultMultiPoints(results, point_type, ret_val);
 }
 
-val parallelOffsetMulti(val multi_points, bool isClosed, double offset, int point_type) {
+val parallelOffsetMulti(val multi_points, bool isClosed, double offset, int point_type, val ret_val) {
     if (!multi_points.isArray()) return val::undefined();
+    
+    auto l = multi_points["length"].as<unsigned>();
+    for (auto i = 0; i < l; i++) parallelOffset(multi_points[i], isClosed, offset, point_type, ret_val);
     
     return val::undefined();
 }
 
-std::vector<cavc::Polyline<double>> simpleJoin(std::vector<cavc::Polyline<double>>& left, std::vector<cavc::Polyline<double>>& right) {
-    std::vector<cavc::Polyline<double>> result(1);
+void simpleJoin(std::vector<cavc::Polyline<double>>& result, std::vector<cavc::Polyline<double>>& left, std::vector<cavc::Polyline<double>>& right) {
     std::vector<cavc::PlineVertex<double>>& p_left = left[0].vertexes(), p_right = right[0].vertexes();
-    cavc::Polyline<double> p(p_left.size() + p_right.size());
-    for (auto it = p_left.begin(); it != p_left.end(); ++it) p.push_back(*it);
-    for (auto it = p_right.rbegin(); it != p_right.rend(); ++it) p.push_back(*it);
+    cavc::Polyline<double> p;
+    for (auto it = p_left.begin(); it != p_left.end(); ++it) p.addVertex(*it);
+    for (auto it = p_right.rbegin(); it != p_right.rend(); ++it) p.addVertex(*it);
     result.push_back(p);
-    return result;
 }
 
-val polygonize(val line, double width, int point_type) {
+void joinByEqualPoints(std::vector<cavc::Polyline<double>>& result, std::vector<cavc::Polyline<double>>& left, std::vector<cavc::Polyline<double>>& right) {
+    ;
+}
+
+val polygonize(val line, double width, int point_type, val ret_val) {
+    if (!line.isArray()) return val::undefined();
+    
+    cavc::Polyline<double> input = getInput(line, false);
+    
+    width /= 2;
+    std::vector<cavc::Polyline<double>> result = cavc::polygonize(input, width);
+    
+    return createResultMultiPoints(result, point_type, ret_val);
+}
+    
+val polygonize1(val line, double width, int point_type, val ret_val) {
     if (!line.isArray()) return val::undefined();
     
     cavc::Polyline<double> input = getInput(line, false);
     
     width /= 2;
     std::vector<cavc::Polyline<double>> left = cavc::parallelOffset(input, width);
-    std::vector<cavc::Polyline<double>> right = cavc::parallelOffset(input, width);
+    std::vector<cavc::Polyline<double>> right = cavc::parallelOffset(input, -width);
     
     std::vector<cavc::Polyline<double>> result;
     if (left.size() == 1 && right.size() == 1) {
-        result = simpleJoin(left, right);
+        simpleJoin(result, left, right);
     }
     
-    return createResultMultiPoints(result, point_type);
+    return createResultMultiPoints(result, point_type, ret_val);
+}
+
+val polygonizeMulti(val multi_line, double width, int point_type, val ret_val) {
+    if (!multi_line.isArray()) return val::undefined();
+        
+    auto l = multi_line["length"].as<unsigned>();
+    for (auto i = 0; i < l; i++) polygonize(multi_line[i], width, point_type, ret_val);
+    
+    return ret_val;
 }
 
 EMSCRIPTEN_BINDINGS(cavalier_contours_bindings) {
     function("parallelOffset", &parallelOffset);
     function("polygonize", &polygonize);
+    function("polygonizeMulti", &polygonizeMulti);
 }

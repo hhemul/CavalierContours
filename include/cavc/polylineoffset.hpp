@@ -1266,5 +1266,19 @@ std::vector<Polyline<Real>> parallelOffset(Polyline<Real> const &pline, Real off
   return stitchOffsetSlicesTogether(slices, pline.isClosed(), rawOffset.size() - 1);
 }
 
+template <typename Real>
+std::vector<Polyline<Real>> polygonize(Polyline<Real> const &pline, Real offset) {
+  using namespace internal;
+  if (pline.size() < 2) {
+    return std::vector<Polyline<Real>>();
+  }
+  auto rawOffset = createRawOffsetPline(pline, offset);
+  auto dualRawOffset = createRawOffsetPline(pline, -offset);
+  auto slices = dualSliceAtIntersectsForOffset(pline, rawOffset, dualRawOffset, offset);
+  auto slices2 = dualSliceAtIntersectsForOffset(pline, dualRawOffset, rawOffset, -offset);
+  std::move(slices2.begin(), slices2.end(), std::back_inserter(slices));
+  return stitchOffsetSlicesTogether(slices, pline.isClosed(), rawOffset.size() + dualRawOffset.size() - 1);
+}
+
 } // namespace cavc
 #endif // CAVC_POLYLINEOFFSET_HPP
