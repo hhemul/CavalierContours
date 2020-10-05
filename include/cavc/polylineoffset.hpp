@@ -1280,27 +1280,33 @@ void polygonize_join(
     const std::vector<PlineVertex<Real>> &rawOffset,
     const std::vector<PlineVertex<Real>> &dualRawOffset
 ) {
-//     Polyline<Real> join_line_begin;
-//     join_line_begin.addVertex(dualRawOffset.front());
-//     join_line_begin.addVertex(rawOffset.front());
-//     Polyline<Real> join_line_end;
-//     join_line_begin.addVertex(rawOffset.back());
-//     join_line_begin.addVertex(dualRawOffset.back());
-//     lines.emplace_back(join_line_begin);
-//     lines.emplace_back(join_line_end);
+    Polyline<Real> join_line_begin;
+    join_line_begin.addVertex(dualRawOffset.front());
+    join_line_begin.addVertex(rawOffset.front());
+    Polyline<Real> join_line_end;
+    join_line_end.addVertex(rawOffset.back());
+    join_line_end.addVertex(dualRawOffset.back());
+    lines.push_back(join_line_begin);
+    lines.push_back(join_line_end);
     
     std::list<Polyline<Real>> pl;
     std::move(lines.begin(), lines.end(), std::back_inserter(pl));
     
-    for (auto it0 = pl.begin(); it0 != pl.end(); ++it0) {
-        auto vertexes0 = (*it0).vertexes();
-        auto begin0 = vertexes0.front();
-        auto end0 = vertexes0.back();
+    for (auto it0 = pl.begin(); it0 != pl.end();) {
+        std::vector<PlineVertex<Real>>& vertexes0 = it0->vertexes();
+        if (vertexes0.size() == 0) continue;
+        PlineVertex<Real>& begin0 = vertexes0.front();
+        PlineVertex<Real>& end0 = vertexes0.back();
+        bool merged = false;
         auto it1 = it0;
         for (++it1; it1 != pl.end(); ++it1) {
-            auto vertexes1 = (*it1).vertexes();
-            auto begin1 = vertexes1.front();
-            auto end1 = vertexes1.back();
+            std::vector<PlineVertex<Real>>& vertexes1 = it1->vertexes();
+            if (vertexes1.size() == 0) continue;
+            PlineVertex<Real>& begin1 = vertexes1.front();
+            PlineVertex<Real>& end1 = vertexes1.back();
+            std::cout << "\n0 ";
+            debug(vertexes0);
+            debug(vertexes1);
             if (utils::fuzzyEqual(begin0.x(), end1.x()) && utils::fuzzyEqual(begin0.y(), end1.y())) {
                 std::cout << "\n1 ";
                 debug(vertexes0);
@@ -1310,6 +1316,7 @@ void polygonize_join(
                 debug(vertexes0);
                 debug(vertexes1);
                 vertexes1.clear();
+                merged = true;
             } else if (utils::fuzzyEqual(begin1.x(), end0.x()) && utils::fuzzyEqual(begin1.y(), end0.y())) {
                 std::cout << "\n2 ";
                 debug(vertexes0);
@@ -1318,6 +1325,7 @@ void polygonize_join(
                 debug(vertexes0);
                 debug(vertexes1);
                 vertexes1.clear();
+                merged = true;
             } else if (utils::fuzzyEqual(begin0.x(), begin1.x()) && utils::fuzzyEqual(begin0.y(), begin1.y())) {
                 std::cout << "\n3 ";
                 debug(vertexes0);
@@ -1328,6 +1336,7 @@ void polygonize_join(
                 debug(vertexes0);
                 debug(vertexes1);
                 vertexes1.clear();
+                merged = true;
             } else if (utils::fuzzyEqual(end0.x(), end1.x()) && utils::fuzzyEqual(end0.y(), end1.y())) {
                 std::cout << "\n4 ";
                 debug(vertexes0);
@@ -1336,10 +1345,13 @@ void polygonize_join(
                 debug(vertexes0);
                 debug(vertexes1);
                 vertexes1.clear();
+                merged = true;
             }
         }
+        if (!merged) ++it0;
     }
     
+    lines.clear();
     std::move(pl.begin(), pl.end(), std::back_inserter(lines));
 }
 
