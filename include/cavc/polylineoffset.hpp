@@ -4,6 +4,8 @@
 #include "polylineintersects.hpp"
 #include <unordered_map>
 #include <vector>
+#include <list>
+#include <iostream>
 
 // This header has functions for offsetting polylines
 
@@ -1267,6 +1269,81 @@ std::vector<Polyline<Real>> parallelOffset(Polyline<Real> const &pline, Real off
 }
 
 template <typename Real>
+void debug(const std::vector<PlineVertex<Real>> &v) {
+    for (auto it = v.begin(); it != v.end(); ++it) std::cout << "[" << it->x() << "," << it->y() << "], ";
+    std::cout << "\n";
+}
+
+template <typename Real>
+void polygonize_join(
+    std::vector<Polyline<Real>> &lines,
+    const std::vector<PlineVertex<Real>> &rawOffset,
+    const std::vector<PlineVertex<Real>> &dualRawOffset
+) {
+//     Polyline<Real> join_line_begin;
+//     join_line_begin.addVertex(dualRawOffset.front());
+//     join_line_begin.addVertex(rawOffset.front());
+//     Polyline<Real> join_line_end;
+//     join_line_begin.addVertex(rawOffset.back());
+//     join_line_begin.addVertex(dualRawOffset.back());
+//     lines.emplace_back(join_line_begin);
+//     lines.emplace_back(join_line_end);
+    
+    std::list<Polyline<Real>> pl;
+    std::move(lines.begin(), lines.end(), std::back_inserter(pl));
+    
+    for (auto it0 = pl.begin(); it0 != pl.end(); ++it0) {
+        auto vertexes0 = (*it0).vertexes();
+        auto begin0 = vertexes0.front();
+        auto end0 = vertexes0.back();
+        auto it1 = it0;
+        for (++it1; it1 != pl.end(); ++it1) {
+            auto vertexes1 = (*it1).vertexes();
+            auto begin1 = vertexes1.front();
+            auto end1 = vertexes1.back();
+            if (utils::fuzzyEqual(begin0.x(), end1.x()) && utils::fuzzyEqual(begin0.y(), end1.y())) {
+                std::cout << "\n1 ";
+                debug(vertexes0);
+                debug(vertexes1);
+                std::move(vertexes0.begin() + 1, vertexes0.end(), std::back_inserter(vertexes1));
+                std::swap(vertexes0, vertexes1);
+                debug(vertexes0);
+                debug(vertexes1);
+                vertexes1.clear();
+            } else if (utils::fuzzyEqual(begin1.x(), end0.x()) && utils::fuzzyEqual(begin1.y(), end0.y())) {
+                std::cout << "\n2 ";
+                debug(vertexes0);
+                debug(vertexes1);
+                std::move(vertexes1.begin() + 1, vertexes1.end(), std::back_inserter(vertexes0));
+                debug(vertexes0);
+                debug(vertexes1);
+                vertexes1.clear();
+            } else if (utils::fuzzyEqual(begin0.x(), begin1.x()) && utils::fuzzyEqual(begin0.y(), begin1.y())) {
+                std::cout << "\n3 ";
+                debug(vertexes0);
+                debug(vertexes1);
+                std::reverse(vertexes1.begin(), vertexes1.end());
+                std::move(vertexes0.begin() + 1, vertexes0.end(), std::back_inserter(vertexes1));
+                std::swap(vertexes0, vertexes1);
+                debug(vertexes0);
+                debug(vertexes1);
+                vertexes1.clear();
+            } else if (utils::fuzzyEqual(end0.x(), end1.x()) && utils::fuzzyEqual(end0.y(), end1.y())) {
+                std::cout << "\n4 ";
+                debug(vertexes0);
+                debug(vertexes1);
+                std::move(vertexes1.rbegin() + 1, vertexes1.rend(), std::back_inserter(vertexes0));
+                debug(vertexes0);
+                debug(vertexes1);
+                vertexes1.clear();
+            }
+        }
+    }
+    
+    std::move(pl.begin(), pl.end(), std::back_inserter(lines));
+}
+
+template <typename Real>
 std::vector<Polyline<Real>> polygonize(Polyline<Real> const &pline, Real offset) {
   using namespace internal;
   if (pline.size() < 2) {
@@ -1277,7 +1354,9 @@ std::vector<Polyline<Real>> polygonize(Polyline<Real> const &pline, Real offset)
   auto slices = dualSliceAtIntersectsForOffset(pline, rawOffset, dualRawOffset, offset);
   auto slices2 = dualSliceAtIntersectsForOffset(pline, dualRawOffset, rawOffset, -offset);
   std::move(slices2.begin(), slices2.end(), std::back_inserter(slices));
-  return stitchOffsetSlicesTogether(slices, pline.isClosed(), rawOffset.size() + dualRawOffset.size() - 1);
+  auto result = stitchOffsetSlicesTogether(slices, pline.isClosed(), rawOffset.size() + dualRawOffset.size() - 1);
+  polygonize_join<Real>(result, rawOffset.vertexes(), dualRawOffset.vertexes());
+  return result;
 }
 
 } // namespace cavc

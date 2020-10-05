@@ -2,7 +2,7 @@
 
 # install emscripten https://emscripten.org/docs/getting_started/downloads.html
 
-emcc --bind --no-entry -I../../include -O0 -s WASM=1 -s STRICT=1 -s INVOKE_RUN=0 -s NO_FILESYSTEM=1 -s ENVIRONMENT=web -o bindings.js bindings.cpp
+emcc --bind --no-entry -I../../include -O3 -g4 --source-map-base / -fsanitize=address -s ALLOW_MEMORY_GROWTH  -s ASSERTIONS=1 -s WASM=1 -s STRICT=1 -s INVOKE_RUN=0 -s NO_FILESYSTEM=1 -s ENVIRONMENT=web -o bindings.js bindings.cpp
 
 # ENVIRONMENT must be one of
 #    'web'     - the normal web environment.
