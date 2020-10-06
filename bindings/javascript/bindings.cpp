@@ -67,8 +67,10 @@ cavc::Polyline<double> getInput(const val& points, bool isClosed) {
 val createResultMultiPoints(std::vector<cavc::Polyline<double>>& multi_points, int point_type, val ret_val = val::array()) {
     auto new_point = getNewPointFunc(point_type);
     for (auto it = multi_points.begin(); it != multi_points.end(); ++it) {
-        auto line = new_line(it->vertexes(), new_point);
-        ret_val.call<void>("push", line);
+        if (it->vertexes().size() > 1) {
+            auto line = new_line(it->vertexes(), new_point);
+            ret_val.call<void>("push", line);
+        }
     }
     
     return ret_val;
@@ -93,18 +95,6 @@ val parallelOffsetMulti(val multi_points, bool isClosed, double offset, int poin
     return val::undefined();
 }
 
-void simpleJoin(std::vector<cavc::Polyline<double>>& result, std::vector<cavc::Polyline<double>>& left, std::vector<cavc::Polyline<double>>& right) {
-    std::vector<cavc::PlineVertex<double>>& p_left = left[0].vertexes(), p_right = right[0].vertexes();
-    cavc::Polyline<double> p;
-    for (auto it = p_left.begin(); it != p_left.end(); ++it) p.addVertex(*it);
-    for (auto it = p_right.rbegin(); it != p_right.rend(); ++it) p.addVertex(*it);
-    result.push_back(p);
-}
-
-void joinByEqualPoints(std::vector<cavc::Polyline<double>>& result, std::vector<cavc::Polyline<double>>& left, std::vector<cavc::Polyline<double>>& right) {
-    ;
-}
-
 val polygonize(val line, double width, int point_type, val ret_val) {
     if (!line.isArray()) return val::undefined();
     
@@ -116,23 +106,6 @@ val polygonize(val line, double width, int point_type, val ret_val) {
     return createResultMultiPoints(result, point_type, ret_val);
 }
     
-val polygonize1(val line, double width, int point_type, val ret_val) {
-    if (!line.isArray()) return val::undefined();
-    
-    cavc::Polyline<double> input = getInput(line, false);
-    
-    width /= 2;
-    std::vector<cavc::Polyline<double>> left = cavc::parallelOffset(input, width);
-    std::vector<cavc::Polyline<double>> right = cavc::parallelOffset(input, -width);
-    
-    std::vector<cavc::Polyline<double>> result;
-    if (left.size() == 1 && right.size() == 1) {
-        simpleJoin(result, left, right);
-    }
-    
-    return createResultMultiPoints(result, point_type, ret_val);
-}
-
 val polygonizeMulti(val multi_line, double width, int point_type, val ret_val) {
     if (!multi_line.isArray()) return val::undefined();
         

@@ -542,8 +542,8 @@ function _asan_js_store_d(ptr, val) {
 var wasmMemory;
 
 var wasmTable = new WebAssembly.Table({
- "initial": 559,
- "maximum": 559,
+ "initial": 182,
+ "maximum": 182,
  "element": "anyfunc"
 });
 
@@ -942,7 +942,7 @@ function updateGlobalBufferAndViews(buf) {
  Module["HEAPF64"] = HEAPF64 = new Float64Array(buf);
 }
 
-var STACK_BASE = 43484272, STACKTOP = STACK_BASE, STACK_MAX = 38241392, DYNAMIC_BASE = 43484272;
+var STACK_BASE = 43435888, STACKTOP = STACK_BASE, STACK_MAX = 38193008, DYNAMIC_BASE = 43435888;
 
 assert(STACK_BASE % 16 === 0, "stack must start aligned");
 
@@ -1640,28 +1640,28 @@ var tempDouble;
 var tempI64;
 
 var ASM_CONSTS = {
- 33642885: function() {
+ 33599813: function() {
   return withBuiltinMalloc(function() {
    return allocateUTF8(Module["ASAN_OPTIONS"] || 0);
   });
  },
- 33642983: function() {
+ 33599911: function() {
   return withBuiltinMalloc(function() {
    return allocateUTF8(Module["LSAN_OPTIONS"] || 0);
   });
  },
- 33643080: function() {
+ 33600008: function() {
   return withBuiltinMalloc(function() {
    return allocateUTF8(Module["UBSAN_OPTIONS"] || 0);
   });
  },
- 33664243: function() {
+ 33625472: function() {
   return STACK_BASE;
  },
- 33664266: function() {
+ 33625495: function() {
   return STACK_MAX;
  },
- 33669147: function() {
+ 33630379: function() {
   var setting = Module["printWithColors"];
   if (setting != null) {
    return setting;
@@ -1841,16 +1841,6 @@ function ___cxa_throw(ptr, type, destructor) {
  throw ptr + " - Exception catching is disabled, this exception cannot be caught. Compile with -s DISABLE_EXCEPTION_CATCHING=0 or DISABLE_EXCEPTION_CATCHING=2 to catch.";
 }
 
-function setErrNo(value) {
- _asan_js_store_4(___errno_location() >> 2, value);
- return value;
-}
-
-function ___map_file(pathname, size) {
- setErrNo(63);
- return -1;
-}
-
 var PATH = {
  splitPath: function(filename) {
   var splitPathRe = /^(\/?|)([\s\S]*?)((?:\.{1,2}|[^\/]+?|)(\.[^.\/]*|))(?:[\/]*)$/;
@@ -1961,26 +1951,6 @@ function ___sys_exit_group(status) {
 
 function ___sys_getpid() {
  return 42;
-}
-
-function syscallMunmap(addr, len) {
- if ((addr | 0) === -1 || len === 0) {
-  return -28;
- }
- var info = SYSCALLS.mappings[addr];
- if (!info) return 0;
- if (len === info.len) {
-  assert(SYSCALLS.mappings[addr].flags & 32);
-  SYSCALLS.mappings[addr] = null;
-  if (info.allocated) {
-   _free(info.malloc);
-  }
- }
- return 0;
-}
-
-function ___sys_munmap(addr, len) {
- return syscallMunmap(addr, len);
 }
 
 function ___sys_open(path, flags, varargs) {
@@ -3045,6 +3015,22 @@ function _emscripten_builtin_mmap2(addr, len, prot, flags, fd, off) {
  });
 }
 
+function syscallMunmap(addr, len) {
+ if ((addr | 0) === -1 || len === 0) {
+  return -28;
+ }
+ var info = SYSCALLS.mappings[addr];
+ if (!info) return 0;
+ if (len === info.len) {
+  assert(SYSCALLS.mappings[addr].flags & 32);
+  SYSCALLS.mappings[addr] = null;
+  if (info.allocated) {
+   _free(info.malloc);
+  }
+ }
+ return 0;
+}
+
 function _emscripten_builtin_munmap(addr, len) {
  return withBuiltinMalloc(function() {
   return syscallMunmap(addr, len);
@@ -3301,38 +3287,6 @@ function _fd_close(fd) {
  return 0;
 }
 
-function _fd_read(fd, iov, iovcnt, pnum) {
- var stream = SYSCALLS.getStreamFromFD(fd);
- var num = SYSCALLS.doReadv(stream, iov, iovcnt);
- _asan_js_store_4(pnum >> 2, num);
- return 0;
-}
-
-function _fd_seek(fd, offset_low, offset_high, whence, newOffset) {
- abort("it should not be possible to operate on streams when !SYSCALLS_REQUIRE_FILESYSTEM");
-}
-
-function flush_NO_FILESYSTEM() {
- if (typeof _fflush !== "undefined") _fflush(0);
- var buffers = SYSCALLS.buffers;
- if (buffers[1].length) SYSCALLS.printChar(1, 10);
- if (buffers[2].length) SYSCALLS.printChar(2, 10);
-}
-
-function _fd_write(fd, iov, iovcnt, pnum) {
- var num = 0;
- for (var i = 0; i < iovcnt; i++) {
-  var ptr = _asan_js_load_4(iov + i * 8 >> 2);
-  var len = _asan_js_load_4(iov + (i * 8 + 4) >> 2);
-  for (var j = 0; j < len; j++) {
-   SYSCALLS.printChar(fd, _asan_js_load_1u(ptr + j));
-  }
-  num += len;
- }
- _asan_js_store_4(pnum >> 2, num);
- return 0;
-}
-
 var _emscripten_get_now;
 
 _emscripten_get_now = function() {
@@ -3342,6 +3296,11 @@ _emscripten_get_now = function() {
 function _usleep(useconds) {
  var start = _emscripten_get_now();
  while (_emscripten_get_now() - start < useconds / 1e3) {}
+}
+
+function setErrNo(value) {
+ _asan_js_store_4(___errno_location() >> 2, value);
+ return value;
 }
 
 function _nanosleep(rqtp, rmtp) {
@@ -3369,305 +3328,6 @@ function _setTempRet0($i) {
 function _sigaction(signum, act, oldact) {
  err("Calling stub instead of sigaction()");
  return 0;
-}
-
-function __isLeapYear(year) {
- return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
-}
-
-function __arraySum(array, index) {
- var sum = 0;
- for (var i = 0; i <= index; sum += array[i++]) {}
- return sum;
-}
-
-var __MONTH_DAYS_LEAP = [ 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 ];
-
-var __MONTH_DAYS_REGULAR = [ 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 ];
-
-function __addDays(date, days) {
- var newDate = new Date(date.getTime());
- while (days > 0) {
-  var leap = __isLeapYear(newDate.getFullYear());
-  var currentMonth = newDate.getMonth();
-  var daysInCurrentMonth = (leap ? __MONTH_DAYS_LEAP : __MONTH_DAYS_REGULAR)[currentMonth];
-  if (days > daysInCurrentMonth - newDate.getDate()) {
-   days -= daysInCurrentMonth - newDate.getDate() + 1;
-   newDate.setDate(1);
-   if (currentMonth < 11) {
-    newDate.setMonth(currentMonth + 1);
-   } else {
-    newDate.setMonth(0);
-    newDate.setFullYear(newDate.getFullYear() + 1);
-   }
-  } else {
-   newDate.setDate(newDate.getDate() + days);
-   return newDate;
-  }
- }
- return newDate;
-}
-
-function _strftime(s, maxsize, format, tm) {
- var tm_zone = _asan_js_load_4(tm + 40 >> 2);
- var date = {
-  tm_sec: _asan_js_load_4(tm >> 2),
-  tm_min: _asan_js_load_4(tm + 4 >> 2),
-  tm_hour: _asan_js_load_4(tm + 8 >> 2),
-  tm_mday: _asan_js_load_4(tm + 12 >> 2),
-  tm_mon: _asan_js_load_4(tm + 16 >> 2),
-  tm_year: _asan_js_load_4(tm + 20 >> 2),
-  tm_wday: _asan_js_load_4(tm + 24 >> 2),
-  tm_yday: _asan_js_load_4(tm + 28 >> 2),
-  tm_isdst: _asan_js_load_4(tm + 32 >> 2),
-  tm_gmtoff: _asan_js_load_4(tm + 36 >> 2),
-  tm_zone: tm_zone ? UTF8ToString(tm_zone) : ""
- };
- var pattern = UTF8ToString(format);
- var EXPANSION_RULES_1 = {
-  "%c": "%a %b %d %H:%M:%S %Y",
-  "%D": "%m/%d/%y",
-  "%F": "%Y-%m-%d",
-  "%h": "%b",
-  "%r": "%I:%M:%S %p",
-  "%R": "%H:%M",
-  "%T": "%H:%M:%S",
-  "%x": "%m/%d/%y",
-  "%X": "%H:%M:%S",
-  "%Ec": "%c",
-  "%EC": "%C",
-  "%Ex": "%m/%d/%y",
-  "%EX": "%H:%M:%S",
-  "%Ey": "%y",
-  "%EY": "%Y",
-  "%Od": "%d",
-  "%Oe": "%e",
-  "%OH": "%H",
-  "%OI": "%I",
-  "%Om": "%m",
-  "%OM": "%M",
-  "%OS": "%S",
-  "%Ou": "%u",
-  "%OU": "%U",
-  "%OV": "%V",
-  "%Ow": "%w",
-  "%OW": "%W",
-  "%Oy": "%y"
- };
- for (var rule in EXPANSION_RULES_1) {
-  pattern = pattern.replace(new RegExp(rule, "g"), EXPANSION_RULES_1[rule]);
- }
- var WEEKDAYS = [ "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" ];
- var MONTHS = [ "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December" ];
- function leadingSomething(value, digits, character) {
-  var str = typeof value === "number" ? value.toString() : value || "";
-  while (str.length < digits) {
-   str = character[0] + str;
-  }
-  return str;
- }
- function leadingNulls(value, digits) {
-  return leadingSomething(value, digits, "0");
- }
- function compareByDay(date1, date2) {
-  function sgn(value) {
-   return value < 0 ? -1 : value > 0 ? 1 : 0;
-  }
-  var compare;
-  if ((compare = sgn(date1.getFullYear() - date2.getFullYear())) === 0) {
-   if ((compare = sgn(date1.getMonth() - date2.getMonth())) === 0) {
-    compare = sgn(date1.getDate() - date2.getDate());
-   }
-  }
-  return compare;
- }
- function getFirstWeekStartDate(janFourth) {
-  switch (janFourth.getDay()) {
-  case 0:
-   return new Date(janFourth.getFullYear() - 1, 11, 29);
-
-  case 1:
-   return janFourth;
-
-  case 2:
-   return new Date(janFourth.getFullYear(), 0, 3);
-
-  case 3:
-   return new Date(janFourth.getFullYear(), 0, 2);
-
-  case 4:
-   return new Date(janFourth.getFullYear(), 0, 1);
-
-  case 5:
-   return new Date(janFourth.getFullYear() - 1, 11, 31);
-
-  case 6:
-   return new Date(janFourth.getFullYear() - 1, 11, 30);
-  }
- }
- function getWeekBasedYear(date) {
-  var thisDate = __addDays(new Date(date.tm_year + 1900, 0, 1), date.tm_yday);
-  var janFourthThisYear = new Date(thisDate.getFullYear(), 0, 4);
-  var janFourthNextYear = new Date(thisDate.getFullYear() + 1, 0, 4);
-  var firstWeekStartThisYear = getFirstWeekStartDate(janFourthThisYear);
-  var firstWeekStartNextYear = getFirstWeekStartDate(janFourthNextYear);
-  if (compareByDay(firstWeekStartThisYear, thisDate) <= 0) {
-   if (compareByDay(firstWeekStartNextYear, thisDate) <= 0) {
-    return thisDate.getFullYear() + 1;
-   } else {
-    return thisDate.getFullYear();
-   }
-  } else {
-   return thisDate.getFullYear() - 1;
-  }
- }
- var EXPANSION_RULES_2 = {
-  "%a": function(date) {
-   return WEEKDAYS[date.tm_wday].substring(0, 3);
-  },
-  "%A": function(date) {
-   return WEEKDAYS[date.tm_wday];
-  },
-  "%b": function(date) {
-   return MONTHS[date.tm_mon].substring(0, 3);
-  },
-  "%B": function(date) {
-   return MONTHS[date.tm_mon];
-  },
-  "%C": function(date) {
-   var year = date.tm_year + 1900;
-   return leadingNulls(year / 100 | 0, 2);
-  },
-  "%d": function(date) {
-   return leadingNulls(date.tm_mday, 2);
-  },
-  "%e": function(date) {
-   return leadingSomething(date.tm_mday, 2, " ");
-  },
-  "%g": function(date) {
-   return getWeekBasedYear(date).toString().substring(2);
-  },
-  "%G": function(date) {
-   return getWeekBasedYear(date);
-  },
-  "%H": function(date) {
-   return leadingNulls(date.tm_hour, 2);
-  },
-  "%I": function(date) {
-   var twelveHour = date.tm_hour;
-   if (twelveHour == 0) twelveHour = 12; else if (twelveHour > 12) twelveHour -= 12;
-   return leadingNulls(twelveHour, 2);
-  },
-  "%j": function(date) {
-   return leadingNulls(date.tm_mday + __arraySum(__isLeapYear(date.tm_year + 1900) ? __MONTH_DAYS_LEAP : __MONTH_DAYS_REGULAR, date.tm_mon - 1), 3);
-  },
-  "%m": function(date) {
-   return leadingNulls(date.tm_mon + 1, 2);
-  },
-  "%M": function(date) {
-   return leadingNulls(date.tm_min, 2);
-  },
-  "%n": function() {
-   return "\n";
-  },
-  "%p": function(date) {
-   if (date.tm_hour >= 0 && date.tm_hour < 12) {
-    return "AM";
-   } else {
-    return "PM";
-   }
-  },
-  "%S": function(date) {
-   return leadingNulls(date.tm_sec, 2);
-  },
-  "%t": function() {
-   return "\t";
-  },
-  "%u": function(date) {
-   return date.tm_wday || 7;
-  },
-  "%U": function(date) {
-   var janFirst = new Date(date.tm_year + 1900, 0, 1);
-   var firstSunday = janFirst.getDay() === 0 ? janFirst : __addDays(janFirst, 7 - janFirst.getDay());
-   var endDate = new Date(date.tm_year + 1900, date.tm_mon, date.tm_mday);
-   if (compareByDay(firstSunday, endDate) < 0) {
-    var februaryFirstUntilEndMonth = __arraySum(__isLeapYear(endDate.getFullYear()) ? __MONTH_DAYS_LEAP : __MONTH_DAYS_REGULAR, endDate.getMonth() - 1) - 31;
-    var firstSundayUntilEndJanuary = 31 - firstSunday.getDate();
-    var days = firstSundayUntilEndJanuary + februaryFirstUntilEndMonth + endDate.getDate();
-    return leadingNulls(Math.ceil(days / 7), 2);
-   }
-   return compareByDay(firstSunday, janFirst) === 0 ? "01" : "00";
-  },
-  "%V": function(date) {
-   var janFourthThisYear = new Date(date.tm_year + 1900, 0, 4);
-   var janFourthNextYear = new Date(date.tm_year + 1901, 0, 4);
-   var firstWeekStartThisYear = getFirstWeekStartDate(janFourthThisYear);
-   var firstWeekStartNextYear = getFirstWeekStartDate(janFourthNextYear);
-   var endDate = __addDays(new Date(date.tm_year + 1900, 0, 1), date.tm_yday);
-   if (compareByDay(endDate, firstWeekStartThisYear) < 0) {
-    return "53";
-   }
-   if (compareByDay(firstWeekStartNextYear, endDate) <= 0) {
-    return "01";
-   }
-   var daysDifference;
-   if (firstWeekStartThisYear.getFullYear() < date.tm_year + 1900) {
-    daysDifference = date.tm_yday + 32 - firstWeekStartThisYear.getDate();
-   } else {
-    daysDifference = date.tm_yday + 1 - firstWeekStartThisYear.getDate();
-   }
-   return leadingNulls(Math.ceil(daysDifference / 7), 2);
-  },
-  "%w": function(date) {
-   return date.tm_wday;
-  },
-  "%W": function(date) {
-   var janFirst = new Date(date.tm_year, 0, 1);
-   var firstMonday = janFirst.getDay() === 1 ? janFirst : __addDays(janFirst, janFirst.getDay() === 0 ? 1 : 7 - janFirst.getDay() + 1);
-   var endDate = new Date(date.tm_year + 1900, date.tm_mon, date.tm_mday);
-   if (compareByDay(firstMonday, endDate) < 0) {
-    var februaryFirstUntilEndMonth = __arraySum(__isLeapYear(endDate.getFullYear()) ? __MONTH_DAYS_LEAP : __MONTH_DAYS_REGULAR, endDate.getMonth() - 1) - 31;
-    var firstMondayUntilEndJanuary = 31 - firstMonday.getDate();
-    var days = firstMondayUntilEndJanuary + februaryFirstUntilEndMonth + endDate.getDate();
-    return leadingNulls(Math.ceil(days / 7), 2);
-   }
-   return compareByDay(firstMonday, janFirst) === 0 ? "01" : "00";
-  },
-  "%y": function(date) {
-   return (date.tm_year + 1900).toString().substring(2);
-  },
-  "%Y": function(date) {
-   return date.tm_year + 1900;
-  },
-  "%z": function(date) {
-   var off = date.tm_gmtoff;
-   var ahead = off >= 0;
-   off = Math.abs(off) / 60;
-   off = off / 60 * 100 + off % 60;
-   return (ahead ? "+" : "-") + String("0000" + off).slice(-4);
-  },
-  "%Z": function(date) {
-   return date.tm_zone;
-  },
-  "%%": function() {
-   return "%";
-  }
- };
- for (var rule in EXPANSION_RULES_2) {
-  if (pattern.indexOf(rule) >= 0) {
-   pattern = pattern.replace(new RegExp(rule, "g"), EXPANSION_RULES_2[rule](date));
-  }
- }
- var bytes = intArrayFromString(pattern, false);
- if (bytes.length > maxsize) {
-  return 0;
- }
- writeArrayToMemory(bytes, s);
- return bytes.length - 1;
-}
-
-function _strftime_l(s, maxsize, format, tm) {
- return _strftime(s, maxsize, format, tm);
 }
 
 function _sysconf(name) {
@@ -3922,11 +3582,9 @@ var asmLibraryArg = {
  "__cxa_atexit": ___cxa_atexit,
  "__cxa_throw": ___cxa_throw,
  "__indirect_function_table": wasmTable,
- "__map_file": ___map_file,
  "__sys_dup": ___sys_dup,
  "__sys_exit_group": ___sys_exit_group,
  "__sys_getpid": ___sys_getpid,
- "__sys_munmap": ___sys_munmap,
  "__sys_open": ___sys_open,
  "__sys_prlimit64": ___sys_prlimit64,
  "__sys_read": ___sys_read,
@@ -3976,14 +3634,10 @@ var asmLibraryArg = {
  "environ_get": _environ_get,
  "environ_sizes_get": _environ_sizes_get,
  "fd_close": _fd_close,
- "fd_read": _fd_read,
- "fd_seek": _fd_seek,
- "fd_write": _fd_write,
  "memory": wasmMemory,
  "nanosleep": _nanosleep,
  "setTempRet0": _setTempRet0,
  "sigaction": _sigaction,
- "strftime_l": _strftime_l,
  "sysconf": _sysconf
 };
 
@@ -4057,25 +3711,13 @@ var _asan_c_store_f = Module["_asan_c_store_f"] = createExportWrapper("asan_c_st
 
 var _asan_c_store_d = Module["_asan_c_store_d"] = createExportWrapper("asan_c_store_d");
 
-var dynCall_viijii = Module["dynCall_viijii"] = createExportWrapper("dynCall_viijii");
-
-var dynCall_jiji = Module["dynCall_jiji"] = createExportWrapper("dynCall_jiji");
-
-var dynCall_jiiij = Module["dynCall_jiiij"] = createExportWrapper("dynCall_jiiij");
-
-var dynCall_iiiiij = Module["dynCall_iiiiij"] = createExportWrapper("dynCall_iiiiij");
-
-var dynCall_iiiiijj = Module["dynCall_iiiiijj"] = createExportWrapper("dynCall_iiiiijj");
-
-var dynCall_iiiiiijj = Module["dynCall_iiiiiijj"] = createExportWrapper("dynCall_iiiiiijj");
-
 var dynCall_viiijj = Module["dynCall_viiijj"] = createExportWrapper("dynCall_viiijj");
 
 var dynCall_jii = Module["dynCall_jii"] = createExportWrapper("dynCall_jii");
 
 var __growWasmMemory = Module["__growWasmMemory"] = createExportWrapper("__growWasmMemory");
 
-Module["___heap_base"] = 43484272;
+Module["___heap_base"] = 43435888;
 
 Module["___global_base"] = 33554432;
 
@@ -5066,7 +4708,7 @@ function checkUnflushedContent() {
   has = true;
  };
  try {
-  var flush = flush_NO_FILESYSTEM;
+  var flush = null;
   if (flush) flush();
  } catch (e) {}
  out = print;

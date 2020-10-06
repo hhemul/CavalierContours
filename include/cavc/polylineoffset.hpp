@@ -5,7 +5,6 @@
 #include <unordered_map>
 #include <vector>
 #include <list>
-#include <iostream>
 
 // This header has functions for offsetting polylines
 
@@ -1269,12 +1268,6 @@ std::vector<Polyline<Real>> parallelOffset(Polyline<Real> const &pline, Real off
 }
 
 template <typename Real>
-void debug(const std::vector<PlineVertex<Real>> &v) {
-    for (auto it = v.begin(); it != v.end(); ++it) std::cout << "[" << it->x() << "," << it->y() << "], ";
-    std::cout << "\n";
-}
-
-template <typename Real>
 void polygonize_join(
     std::vector<Polyline<Real>> &lines,
     const std::vector<PlineVertex<Real>> &rawOffset,
@@ -1292,63 +1285,42 @@ void polygonize_join(
     std::list<Polyline<Real>> pl;
     std::move(lines.begin(), lines.end(), std::back_inserter(pl));
     
-    for (auto it0 = pl.begin(); it0 != pl.end();) {
+    for (auto it0 = pl.begin(); it0 != pl.end(); ++it0) {
         std::vector<PlineVertex<Real>>& vertexes0 = it0->vertexes();
         if (vertexes0.size() == 0) continue;
         PlineVertex<Real>& begin0 = vertexes0.front();
         PlineVertex<Real>& end0 = vertexes0.back();
-        bool merged = false;
         auto it1 = it0;
         for (++it1; it1 != pl.end(); ++it1) {
             std::vector<PlineVertex<Real>>& vertexes1 = it1->vertexes();
             if (vertexes1.size() == 0) continue;
             PlineVertex<Real>& begin1 = vertexes1.front();
             PlineVertex<Real>& end1 = vertexes1.back();
-            std::cout << "\n0 ";
-            debug(vertexes0);
-            debug(vertexes1);
             if (utils::fuzzyEqual(begin0.x(), end1.x()) && utils::fuzzyEqual(begin0.y(), end1.y())) {
-                std::cout << "\n1 ";
-                debug(vertexes0);
-                debug(vertexes1);
                 std::move(vertexes0.begin() + 1, vertexes0.end(), std::back_inserter(vertexes1));
                 std::swap(vertexes0, vertexes1);
-                debug(vertexes0);
-                debug(vertexes1);
                 vertexes1.clear();
-                merged = true;
+                --it0;
+                break;
             } else if (utils::fuzzyEqual(begin1.x(), end0.x()) && utils::fuzzyEqual(begin1.y(), end0.y())) {
-                std::cout << "\n2 ";
-                debug(vertexes0);
-                debug(vertexes1);
                 std::move(vertexes1.begin() + 1, vertexes1.end(), std::back_inserter(vertexes0));
-                debug(vertexes0);
-                debug(vertexes1);
                 vertexes1.clear();
-                merged = true;
+                --it0;
+                break;
             } else if (utils::fuzzyEqual(begin0.x(), begin1.x()) && utils::fuzzyEqual(begin0.y(), begin1.y())) {
-                std::cout << "\n3 ";
-                debug(vertexes0);
-                debug(vertexes1);
                 std::reverse(vertexes1.begin(), vertexes1.end());
                 std::move(vertexes0.begin() + 1, vertexes0.end(), std::back_inserter(vertexes1));
                 std::swap(vertexes0, vertexes1);
-                debug(vertexes0);
-                debug(vertexes1);
                 vertexes1.clear();
-                merged = true;
+                --it0;
+                break;
             } else if (utils::fuzzyEqual(end0.x(), end1.x()) && utils::fuzzyEqual(end0.y(), end1.y())) {
-                std::cout << "\n4 ";
-                debug(vertexes0);
-                debug(vertexes1);
                 std::move(vertexes1.rbegin() + 1, vertexes1.rend(), std::back_inserter(vertexes0));
-                debug(vertexes0);
-                debug(vertexes1);
                 vertexes1.clear();
-                merged = true;
+                --it0;
+                break;
             }
         }
-        if (!merged) ++it0;
     }
     
     lines.clear();
