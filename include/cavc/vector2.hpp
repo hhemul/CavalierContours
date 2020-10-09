@@ -74,6 +74,31 @@ Vector2<Real> closestPointOnLineSeg(Vector2<Real> const &p0, Vector2<Real> const
   return p0 + b * v;
 }
 
+/// Returns the closest point that lies on the line segment from p0 to p1 to the point given.
+/// And relative position of that point on line segment. if b < 0 point before p0, if b > 1 point after p1;
+template <typename Real>
+std::pair<Vector2<Real>, Real> closestPointOnLineSeg2(Vector2<Real> const &p0, Vector2<Real> const &p1,
+                                    Vector2<Real> const &point) {
+  // Dot product used to find angles
+  // See: http://geomalgorithms.com/a02-_lines.html
+  Vector2<Real> v = p1 - p0;
+  Vector2<Real> w = point - p0;
+  Real c1 = dot(w, v);
+  Real c2 = dot(v, v);
+  Real b = c1 / c2;
+  
+  Vector2<Real> result;
+  if (b < utils::realThreshold<Real>()) {
+    result = p0;
+  } else if (b > 1.0 + utils::realThreshold<Real>()) {
+    result = p1;
+  } else {
+    result = p0 + b * v;
+  }
+  
+  return std::pair(result, b);
+}
+
 /// Returns true if point is left of the line pointing in the direction of the vector (p1 - p0).
 template <typename Real>
 bool isLeft(Vector2<Real> const &p0, Vector2<Real> const &p1, Vector2<Real> const &point) {

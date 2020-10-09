@@ -1328,7 +1328,34 @@ void polygonize_join(
 }
 
 template <typename Real>
-std::vector<Polyline<Real>> polygonize(Polyline<Real> const &pline, Real offset) {
+void get_sorted_points_for_section(PlineVertex<Real> &A,PlineVertex<Real> &B, std::vector<Polyline<Real>>& lines, std::vector<Vector2<real>>& result) {
+    result.clear();
+    for (auto it0 = lines.begin(); it0 != lines.end(); ++it0) {
+        auto v = it0->vertexes();
+        for (auto it1 = v.begin(); it1 != v.end(); ++it1) {
+            Vector2<real> p(it1->x(), it1->y());
+            auto r = closestPointOnLineSeg2(A, B, p);
+            auto d = r.point - p;
+            Real distance_squared = dot(d, d);
+            if (utils::fuzzyEqual(distance_squared, offset)) result.emplace_back(p, r);
+        }
+    }
+    using Item = std::pair<Vector2<Real>, std::pair<Vector2<Real>, Real>>;
+    std::sort(result.begin(), result.end(), [](const Item& a, const Item& b) {
+        a.second().second() < b.second().second();
+    });
+}
+
+template <typename Real>
+void polygonize_join_with_intersections(std::vector<Polyline<Real>>& lines, Polyline<Real> const &pline) {
+    auto l = pline.size() - 1;
+    for (auto i = 0; i < l; i++) {
+        PlineVertex<Real> &A = pline[i], &B = pline[i + 1];
+    }
+}
+
+template <typename Real>
+std::vector<Polyline<Real>> polygonize(Polyline<Real> const &pline, Real offset, bool allowSelfIntersection = false) {
   using namespace internal;
   if (pline.size() < 2) {
     return std::vector<Polyline<Real>>();
@@ -1337,10 +1364,27 @@ std::vector<Polyline<Real>> polygonize(Polyline<Real> const &pline, Real offset)
   auto dualRawOffset = createRawOffsetPline(pline, -offset);
   auto slices = dualSliceAtIntersectsForOffset(pline, rawOffset, dualRawOffset, offset);
   auto slices2 = dualSliceAtIntersectsForOffset(pline, dualRawOffset, rawOffset, -offset);
-  std::move(slices2.begin(), slices2.end(), std::back_inserter(slices));
-  auto result = stitchOffsetSlicesTogether(slices, pline.isClosed(), rawOffset.size() + dualRawOffset.size() - 1);
-  polygonize_join<Real>(result, rawOffset.vertexes(), dualRawOffset.vertexes());
-  return result;
+  if (!allowSelfIntersection) {
+    std::move(slices2.begin(), slices2.end(), std::back_inserter(slices));
+    auto result = stitchOffsetSlicesTogether(slices, pline.isClosed(), rawOffset.size() + dualRawOffset.size() - 1);
+    polygonize_join<Real>(result, rawOffset.vertexes(), dualRawOffset.vertexes());
+    return result;
+  } else {
+    auto left = stitchOffsetSlicesTogether(slices, pline.isClosed(), rawOffset.size() - 1);
+    auto right = stitchOffsetSlicesTogether(slices2, pline.isClosed(), dualRawOffset.size() - 1);
+      
+    std::vector<PlineVertex<Real>>& in_v = left.front().vertexes();
+    for (auto it = left.begin() + 1; it != left.end(); ++it) {
+        std::vector<PlineVertex<Real>>& v = it->vertexes();
+        std::move(v.begin(), v.end(), std::back_inserter(in_v));
+    }
+    left.erase(left.begin() + 1, left.end());
+    for (auto it = right.rbegin(); it != right.rend(); ++it) {
+        std::vector<PlineVertex<Real>>& v = it->vertexes();
+        std::move(v.rbegin(), v.rend(), std::back_inserter(in_v));
+    }
+    return left;
+  }
 }
 
 } // namespace cavc

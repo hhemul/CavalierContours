@@ -95,22 +95,22 @@ val parallelOffsetMulti(val multi_points, bool isClosed, double offset, int poin
     return val::undefined();
 }
 
-val polygonize(val line, double width, int point_type, val ret_val) {
+val polygonize(val line, double width, int point_type, bool allowSelfIntersection, val ret_val) {
     if (!line.isArray()) return val::undefined();
     
     cavc::Polyline<double> input = getInput(line, false);
     
     width /= 2;
-    std::vector<cavc::Polyline<double>> result = cavc::polygonize(input, width);
+    std::vector<cavc::Polyline<double>> result = cavc::polygonize(input, width, allowSelfIntersection);
     
     return createResultMultiPoints(result, point_type, ret_val);
 }
     
-val polygonizeMulti(val multi_line, double width, int point_type, val ret_val) {
+val polygonizeMulti(val multi_line, double width, int point_type, bool allowSelfIntersection, val ret_val) {
     if (!multi_line.isArray()) return val::undefined();
         
     auto l = multi_line["length"].as<unsigned>();
-    for (auto i = 0; i < l; i++) polygonize(multi_line[i], width, point_type, ret_val);
+    for (auto i = 0; i < l; i++) polygonize(multi_line[i], width, point_type, allowSelfIntersection, ret_val);
     
     return ret_val;
 }
