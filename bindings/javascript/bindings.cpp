@@ -1,4 +1,5 @@
 #include "cavc/polylineoffset.hpp"
+#include "cavc/polylinecombine.hpp"
 #include <emscripten/bind.h>
 
 using namespace emscripten;
@@ -113,6 +114,34 @@ val polygonizeMulti(val multi_line, double width, int point_type, bool allowSelf
     for (auto i = 0; i < l; i++) polygonize(multi_line[i], width, point_type, allowSelfIntersection, ret_val);
     
     return ret_val;
+}
+
+val combine(val polygon1, val polygon2, int op, int point_type, val ret_val) {
+    if (!polygon1.isArray() || !polygon2.isArray()) return val::undefined();
+    
+    cavc::Polyline<double> input1 = getInput(polygon1, true);
+    cavc::Polyline<double> input2 = getInput(polygon2, true);
+    int mode;
+    switch (op) {
+        case 0:
+            mode = PlineCombineMode::Union;
+            break;
+        case 1:
+            mode = PlineCombineMode::Exclude;
+            break;
+        case 2:
+            mode = PlineCombineMode::Intersect;
+            break;
+        case 3:
+            mode = PlineCombineMode::XOR;
+            break;
+        default:
+            return val::null();
+    }
+    
+    CombineResult<double> result = combinePolylines(input1, input2, mode);
+    
+    return createResultMultiPoints(result.remaining, point_type, ret_val);
 }
 
 EMSCRIPTEN_BINDINGS(cavalier_contours_bindings) {

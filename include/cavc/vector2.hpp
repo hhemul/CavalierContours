@@ -96,7 +96,7 @@ std::pair<Vector2<Real>, Real> closestPointOnLineSeg2(Vector2<Real> const &p0, V
     result = p0 + b * v;
   }
   
-  return std::pair(result, b);
+  return std::pair<Vector2<Real>, Real>(result, b);
 }
 
 /// Returns true if point is left of the line pointing in the direction of the vector (p1 - p0).

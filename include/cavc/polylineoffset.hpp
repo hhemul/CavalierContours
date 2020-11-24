@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <vector>
 #include <list>
+// #include <iostream>
 
 // This header has functions for offsetting polylines
 
@@ -1328,30 +1329,60 @@ void polygonize_join(
 }
 
 template <typename Real>
-void get_sorted_points_for_section(PlineVertex<Real> &A,PlineVertex<Real> &B, std::vector<Polyline<Real>>& lines, std::vector<Vector2<real>>& result) {
+using PointSortingType = std::pair<Vector2<Real>, std::pair<Vector2<Real>, Real>>;
+
+template <typename Real>
+void get_sorted_points_for_section(PlineVertex<Real> const &A, PlineVertex<Real> const &B, std::vector<Polyline<Real>>& lines, Real offset, std::vector<PointSortingType<Real>>& result) {
     result.clear();
+    bool so = offset < 0.0;
+    Real aoffset2 = offset * offset;
     for (auto it0 = lines.begin(); it0 != lines.end(); ++it0) {
         auto v = it0->vertexes();
         for (auto it1 = v.begin(); it1 != v.end(); ++it1) {
-            Vector2<real> p(it1->x(), it1->y());
-            auto r = closestPointOnLineSeg2(A, B, p);
-            auto d = r.point - p;
+            Vector2<Real> p(it1->x(), it1->y());
+            Vector2<Real> BA = B.pos() - A.pos(), pA = p - A.pos();
+            Real cross_product = BA.x() * pA.y() - BA.y() * pA.x();
+            bool sc = cross_product < 0.0;
+            if (so != sc) continue;
+            auto r = closestPointOnLineSeg2(A.pos(), B.pos(), p);
+            auto d = r.first - p;
             Real distance_squared = dot(d, d);
-            if (utils::fuzzyEqual(distance_squared, offset)) result.emplace_back(p, r);
+            if (utils::fuzzyEqual(distance_squared, aoffset2)) result.emplace_back(p, r);
         }
     }
-    using Item = std::pair<Vector2<Real>, std::pair<Vector2<Real>, Real>>;
-    std::sort(result.begin(), result.end(), [](const Item& a, const Item& b) {
-        a.second().second() < b.second().second();
+    std::sort(result.begin(), result.end(), [](const PointSortingType<Real>& a, const PointSortingType<Real>& b) {
+        return a.second.second < b.second.second;
     });
 }
 
 template <typename Real>
-void polygonize_join_with_intersections(std::vector<Polyline<Real>>& lines, Polyline<Real> const &pline) {
+void polygonize_join_with_intersections(std::vector<Polyline<Real>>& lines, Polyline<Real> const &pline, Real offset) {
     auto l = pline.size() - 1;
+    std::vector<PointSortingType<Real>> tmp;
+    Polyline<Real> result;
+    // std::cout << '\n';
     for (auto i = 0; i < l; i++) {
-        PlineVertex<Real> &A = pline[i], &B = pline[i + 1];
+        PlineVertex<Real> const &A = pline[i], &B = pline[i + 1];
+        // std::cout << '(' << A.x() << ", " << A.y() << "); (" << B.x() << ", " << B.y() << ')' << '\n';
+        get_sorted_points_for_section(A, B, lines, offset, tmp);
+        for (auto it = tmp.begin(); it != tmp.end(); ++it) {
+            const auto& P = it->first;
+            if (result.size() != 0 && utils::fuzzyEqual(result.lastVertex().x(), P.x()) && utils::fuzzyEqual(result.lastVertex().y(), P.y())) {
+                continue;
+            }
+            if (result.size() > 1) {
+                const auto& A = result[result.size() - 2].pos();
+                const auto& B = result[result.size() - 1].pos();
+                auto BA = B - A, PB = P - B;
+                Real cross_product = BA.x() * PB.y() - BA.y() * PB.x();
+                if (utils::fuzzyEqual(cross_product, 0.0)) result.vertexes().pop_back();
+            }
+            result.addVertex(P.x(), P.y(), 0);
+            // std::cout << '(' << P.x() << ", " << P.y() << "); (" << it->second.first.x() << ", " << it->second.first.y() << "); " << it->second.second << '\n';
+        }
     }
+    lines.clear();
+    lines.push_back(result);
 }
 
 template <typename Real>
@@ -1372,17 +1403,12 @@ std::vector<Polyline<Real>> polygonize(Polyline<Real> const &pline, Real offset,
   } else {
     auto left = stitchOffsetSlicesTogether(slices, pline.isClosed(), rawOffset.size() - 1);
     auto right = stitchOffsetSlicesTogether(slices2, pline.isClosed(), dualRawOffset.size() - 1);
-      
-    std::vector<PlineVertex<Real>>& in_v = left.front().vertexes();
-    for (auto it = left.begin() + 1; it != left.end(); ++it) {
-        std::vector<PlineVertex<Real>>& v = it->vertexes();
-        std::move(v.begin(), v.end(), std::back_inserter(in_v));
-    }
-    left.erase(left.begin() + 1, left.end());
-    for (auto it = right.rbegin(); it != right.rend(); ++it) {
-        std::vector<PlineVertex<Real>>& v = it->vertexes();
-        std::move(v.rbegin(), v.rend(), std::back_inserter(in_v));
-    }
+    
+    polygonize_join_with_intersections(left, pline, offset);
+    polygonize_join_with_intersections(right, pline, -offset);
+    
+    std::move(right.front().vertexes().rbegin(), right.front().vertexes().rend(), std::back_inserter(left.front().vertexes()));
+
     return left;
   }
 }
