@@ -334,12 +334,15 @@ stitchOrderedSlicesIntoClosedPolylines(std::vector<Polyline<Real>> const &slices
 /// XOR(A, B) = A XOR B.
 enum class PlineCombineMode { Union, Exclude, Intersect, XOR };
 
+enum class CombineStatus { CompletelyUncoincident, CompletelyCoincident, AnyIntersects, AInsideB, BInsideA };
+
 /// Type to hold result of combining closed polylines. remaining holds the resulting closed
 /// polylines after the operation. subtracted holds closed polylines that represent subtracted space
 /// (these polylines are always fully enclosed by one the polylines in remaining).
 template <typename Real> struct CombineResult {
   std::vector<Polyline<Real>> remaining;
   std::vector<Polyline<Real>> subtracted;
+  CombineStatus status;
 };
 
 /// Combine two closed polylines applying a particular combine mode (boolean operation).
@@ -390,19 +393,24 @@ CombineResult<Real> combinePolylines(Polyline<Real> const &plineA, Polyline<Real
 
   auto performUnion = [&] {
     if (combineInfo.completelyCoincident()) {
+      result.status = CombineStatus::CompletelyCoincident;
       result.remaining.push_back(plineA);
       return;
     }
     if (!combineInfo.anyIntersects()) {
       if (isAInsideB()) {
+        result.status = CombineStatus::AInsideB;
         result.remaining.push_back(plineB);
       } else if (isBInsideA()) {
+        result.status = CombineStatus::BInsideA;
         result.remaining.push_back(plineA);
       } else {
+        result.status = CombineStatus::CompletelyUncoincident;
         result.remaining.push_back(plineA);
         result.remaining.push_back(plineB);
       }
     } else {
+      result.status = CombineStatus::AnyIntersects;
       std::vector<Polyline<Real>> slicesRemaining;
       // slice plineB, keeping all slices not in plineA
       sliceAtIntersects(
@@ -441,21 +449,26 @@ CombineResult<Real> combinePolylines(Polyline<Real> const &plineA, Polyline<Real
 
   auto performExclude = [&] {
     if (combineInfo.completelyCoincident()) {
+      result.status = CombineStatus::CompletelyCoincident;
       // nothing left
       return;
     }
     if (!combineInfo.anyIntersects()) {
       if (isAInsideB()) {
+        result.status = CombineStatus::AInsideB;
         // no results (everything excluded)
       } else if (isBInsideA()) {
+        result.status = CombineStatus::BInsideA;
         // island created inside A
         result.remaining.push_back(plineA);
         result.subtracted.push_back(plineB);
       } else {
+        result.status = CombineStatus::CompletelyUncoincident;
         // no overlap
         result.remaining.push_back(plineA);
       }
     } else {
+      result.status = CombineStatus::AnyIntersects;
       std::vector<Polyline<Real>> slicesRemaining;
 
       // slice plineB, keeping all slices in plineA
@@ -481,16 +494,23 @@ CombineResult<Real> combinePolylines(Polyline<Real> const &plineA, Polyline<Real
 
   auto performIntersect = [&] {
     if (combineInfo.completelyCoincident()) {
+      result.status = CombineStatus::CompletelyCoincident;
       result.remaining.push_back(plineA);
       return;
     }
     if (!combineInfo.anyIntersects()) {
       if (isAInsideB()) {
+        result.status = CombineStatus::AInsideB;
         result.remaining.push_back(plineA);
       } else if (isBInsideA()) {
+        result.status = CombineStatus::BInsideA;
         result.remaining.push_back(plineB);
-      } // else no overlap
+      } else {
+        result.status = CombineStatus::CompletelyUncoincident;
+        // no overlap
+      }
     } else {
+      result.status = CombineStatus::AnyIntersects;
       std::vector<Polyline<Real>> slicesRemaining;
       // slice plineB, keeping all slices in plineA
       sliceAtIntersects(plineB, combineInfo, true, pointInA, slicesRemaining);
@@ -514,20 +534,25 @@ CombineResult<Real> combinePolylines(Polyline<Real> const &plineA, Polyline<Real
 
   auto performXOR = [&] {
     if (combineInfo.completelyCoincident()) {
+      result.status = CombineStatus::CompletelyCoincident;
       return;
     }
     if (!combineInfo.anyIntersects()) {
       if (isAInsideB()) {
+        result.status = CombineStatus::AInsideB;
         result.remaining.push_back(plineB);
         result.subtracted.push_back(plineA);
       } else if (isBInsideA()) {
+        result.status = CombineStatus::BInsideA;
         result.remaining.push_back(plineA);
         result.subtracted.push_back(plineB);
       } else {
+        result.status = CombineStatus::CompletelyUncoincident;
         result.remaining.push_back(plineA);
         result.remaining.push_back(plineB);
       }
     } else {
+      result.status = CombineStatus::AnyIntersects;
       std::vector<Polyline<Real>> slicesRemaining;
       // slice plineB, keeping all slices
       sliceAtIntersects(
